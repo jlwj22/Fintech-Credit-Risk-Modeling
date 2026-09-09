@@ -1,0 +1,27 @@
+{
+  "logistic_regression": {
+    "roc_auc": 0.8628,
+    "pr_auc": 0.3885,
+    "ks_statistic": 0.5712,
+    "gini": 0.7255,
+    "confusion_matrix_at_0.5": {
+      "true_negative": 28256,
+      "false_positive": 6738,
+      "false_negative": 596,
+      "true_positive": 1910
+    }
+  },
+  "xgboost": {
+    "roc_auc": 0.8684,
+    "pr_auc": 0.4032,
+    "ks_statistic": 0.5757,
+    "gini": 0.7368,
+    "confusion_matrix_at_0.5": {
+      "true_negative": 28215,
+      "false_positive": 6779,
+      "false_negative": 585,
+      "true_positive": 1921
+    },
+    "top_decile_capture_rate": 0.5547
+  }
+}
