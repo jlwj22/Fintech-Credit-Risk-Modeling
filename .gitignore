@@ -3,11 +3,16 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 .pytest_cache/
+.ruff_cache/
 
 # Virtual environments
 .venv/
 venv/
 env/
+
+# Data is downloaded, not committed: python -m src.download_data
+data/raw/
+data/processed/
 
 # OS
 .DS_Store
@@ -18,3 +23,6 @@ env/
 # Editors
 .vscode/
 .idea/
+
+# Local secrets
+.env
