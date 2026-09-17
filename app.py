@@ -7,31 +7,13 @@ top factors driving that specific prediction (via SHAP).
 
 Run with: streamlit run app.py
 """
-import joblib
 import numpy as np
-import pandas as pd
-import shap
 import streamlit as st
 
-from src.data_prep import MODEL_FEATURES, clean_and_engineer
-from src.scorecard import RISK_TIERS, pd_to_score, score_to_tier
+from src.predict import score_applicant
+from src.scorecard import RISK_TIERS
 
 st.set_page_config(page_title="Credit Risk Scoring Demo", page_icon="\U0001F4B3", layout="wide")
-
-
-@st.cache_resource
-def load_model():
-    bundle = joblib.load("models/xgb.joblib")
-    return bundle["model"], bundle["features"]
-
-
-@st.cache_resource
-def load_explainer(_model):
-    return shap.TreeExplainer(_model)
-
-
-model, features = load_model()
-explainer = load_explainer(model)
 
 st.title("\U0001F4B3 Credit Risk Scoring Demo")
 st.caption(
@@ -60,7 +42,7 @@ with st.sidebar:
     late_60_89 = st.slider("Times 60-89 days past due", 0, 10, 0)
     late_90 = st.slider("Times 90+ days late", 0, 10, 0)
 
-raw = pd.DataFrame([{
+applicant = {
     "RevolvingUtilizationOfUnsecuredLines": revolving_util,
     "age": age,
     "NumberOfTime30-59DaysPastDueNotWorse": late_30_59,
@@ -71,18 +53,19 @@ raw = pd.DataFrame([{
     "NumberRealEstateLoansOrLines": real_estate_loans,
     "NumberOfTime60-89DaysPastDueNotWorse": late_60_89,
     "NumberOfDependents": dependents,
-}])
+}
 
-engineered = clean_and_engineer(raw)
-X = engineered[features]
-
-pd_default = float(model.predict_proba(X)[0, 1])
-score = float(pd_to_score(pd_default))
-tier = score_to_tier(score)
+result = score_applicant(applicant)
+pd_default = result["probability_of_default"]
+score = result["score"]
+tier = result["tier"]
 
 col1, col2, col3 = st.columns(3)
 col1.metric("Probability of default (2yr)", f"{pd_default:.1%}")
-col2.metric("Scaled credit score", f"{score:.0f}", help="Scaled to a 300-850 range using standard points-to-double-odds scorecard scaling.")
+col2.metric(
+    "Scaled credit score", f"{score:.0f}",
+    help="Scaled to 300-850 with points-to-double-the-odds scorecard scaling.",
+)
 col3.metric("Risk tier", tier)
 
 tier_colors = {
@@ -99,23 +82,32 @@ st.markdown(
 )
 
 st.subheader("What's driving this prediction?")
-shap_values = explainer(X)
+if result["reasons"]:
+    st.markdown("**Top reasons (adverse action style):** " + "; ".join(result["reasons"]))
 contribs = (
-    pd.DataFrame({"feature": features, "shap_value": shap_values.values[0]})
+    result["contributions"].rename("shap_value").rename_axis("feature").reset_index()
     .sort_values("shap_value", key=abs, ascending=False)
     .head(8)
 )
 contribs["direction"] = np.where(contribs["shap_value"] > 0, "Increases risk", "Decreases risk")
 st.bar_chart(contribs.set_index("feature")["shap_value"])
-st.dataframe(contribs[["feature", "shap_value", "direction"]], use_container_width=True, hide_index=True)
+st.dataframe(
+    contribs[["feature", "shap_value", "direction"]], use_container_width=True, hide_index=True
+)
 
 with st.expander("About this model"):
     st.markdown(
         """
-        - **Data:** [Give Me Some Credit](https://www.kaggle.com/c/GiveMeSomeCredit) (Kaggle), ~150,000 records.
-        - **Model:** XGBoost classifier, tuned for class imbalance (~6.7% default rate).
-        - **Test-set performance:** ROC-AUC ≈ 0.87, KS ≈ 0.58, Gini ≈ 0.74 (see `reports/figures/` and `models/metrics.json`).
-        - **Score scaling:** points-to-double-the-odds transform (the same methodology used across bank and bureau-built credit scorecards), Base=600 @ 50:1 odds, PDO=20.
-        - This is a portfolio/demo project trained on public benchmark data, not a production underwriting system.
+        - **Data:** [Give Me Some Credit](https://www.kaggle.com/c/GiveMeSomeCredit)
+          (Kaggle), 150,000 records, 6.7% default rate.
+        - **Model:** XGBoost, trained without class reweighting so the PDs are
+          calibrated (mean predicted 6.7% vs. 6.7% observed on the test set).
+        - **Test-set performance:** ROC-AUC 0.87, KS 0.58, Gini 0.74
+          (see `reports/figures/` and `models/metrics.json`).
+        - **Score scaling:** points-to-double-the-odds, 720 at 50:1 odds, PDO 40.
+        - **Reasons:** the top SHAP factors that raised risk, worded the way an
+          adverse action notice would list them.
+        - Built on public benchmark data for a portfolio project, not a
+          production underwriting system.
         """
     )

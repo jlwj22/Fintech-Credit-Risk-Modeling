@@ -2,7 +2,13 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.data_prep import MODEL_FEATURES, PAST_DUE_COLS, TARGET, clean_and_engineer
+from src.data_prep import (
+    MODEL_FEATURES,
+    PAST_DUE_COLS,
+    TARGET,
+    clean_and_engineer,
+    fit_cleaning_params,
+)
 
 
 @pytest.fixture
@@ -55,3 +61,13 @@ def test_missing_flags_are_binary(raw_sample):
 def test_target_untouched(raw_sample):
     out = clean_and_engineer(raw_sample)
     pd.testing.assert_series_equal(out[TARGET], raw_sample[TARGET])
+
+
+def test_scoring_uses_training_params_not_its_own(raw_sample):
+    params = fit_cleaning_params(raw_sample)
+    one = raw_sample.iloc[[1]].copy()
+    out = clean_and_engineer(one, params)
+    # Missing income on a single row is filled with the training median,
+    # and the utilization outlier is capped at the training cap.
+    assert out["MonthlyIncome"].iloc[0] == params["income_median"]
+    assert out["RevolvingUtilization_capped"].iloc[0] == params["util_cap"]

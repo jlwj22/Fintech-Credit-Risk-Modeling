@@ -32,9 +32,8 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
-    RocCurveDisplay,
     average_precision_score,
-    confusion_matrix,
+    brier_score_loss,
     precision_recall_curve,
     roc_auc_score,
     roc_curve,
@@ -43,8 +42,14 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from xgboost import XGBClassifier
 
-from src.data_prep import MODEL_FEATURES, TARGET, prepare
-from src.scorecard import pd_to_score, score_to_tier
+from src.data_prep import (
+    MODEL_FEATURES,
+    TARGET,
+    clean_and_engineer,
+    fit_cleaning_params,
+    load_raw,
+)
+from src.scorecard import pd_to_score
 
 MODELS_DIR = "models"
 FIG_DIR = "reports/figures"
@@ -65,35 +70,38 @@ def main() -> None:
     os.makedirs(MODELS_DIR, exist_ok=True)
     os.makedirs(FIG_DIR, exist_ok=True)
 
-    df = prepare()
-    X = df[MODEL_FEATURES]
-    y = df[TARGET]
-
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.25, stratify=y, random_state=RANDOM_STATE
+    raw = load_raw()
+    raw_train, raw_test = train_test_split(
+        raw, test_size=0.25, stratify=raw[TARGET], random_state=RANDOM_STATE
     )
+
+    # Caps and medians come from the training split only, then get saved
+    # with the model so the app and API clean inputs the same way.
+    cleaning_params = fit_cleaning_params(raw_train)
+    train_df = clean_and_engineer(raw_train, cleaning_params)
+    test_df = clean_and_engineer(raw_test, cleaning_params)
+    X_train, y_train = train_df[MODEL_FEATURES], train_df[TARGET]
+    X_test, y_test = test_df[MODEL_FEATURES], test_df[TARGET]
 
     # --- Logistic regression baseline (scaled features, class-balanced) --
     scaler = StandardScaler()
     X_train_scaled = scaler.fit_transform(X_train)
     X_test_scaled = scaler.transform(X_test)
 
-    logreg = LogisticRegression(
-        max_iter=1000, class_weight="balanced", random_state=RANDOM_STATE
-    )
+    # No class reweighting: reweighting improves nothing for ranking (AUC/KS)
+    # and inflates every predicted PD, which breaks expected-loss math and the
+    # score scale. Plain log-loss keeps probabilities calibrated.
+    logreg = LogisticRegression(max_iter=1000, random_state=RANDOM_STATE)
     logreg.fit(X_train_scaled, y_train)
     logreg_proba = logreg.predict_proba(X_test_scaled)[:, 1]
 
     # --- Gradient boosted model ------------------------------------------
-    pos = y_train.sum()
-    neg = len(y_train) - pos
     xgb = XGBClassifier(
         n_estimators=400,
         max_depth=4,
         learning_rate=0.05,
         subsample=0.8,
         colsample_bytree=0.8,
-        scale_pos_weight=neg / pos,
         eval_metric="auc",
         random_state=RANDOM_STATE,
         n_jobs=-1,
@@ -108,19 +116,14 @@ def main() -> None:
         pr_auc = average_precision_score(y_test, proba)
         ks = ks_statistic(y_test.values, proba)
         gini = 2 * auc - 1
-        preds_at_50 = (proba >= 0.5).astype(int)
-        tn, fp, fn, tp = confusion_matrix(y_test, preds_at_50).ravel()
         metrics[name] = {
             "roc_auc": round(auc, 4),
             "pr_auc": round(pr_auc, 4),
             "ks_statistic": round(ks, 4),
             "gini": round(gini, 4),
-            "confusion_matrix_at_0.5": {
-                "true_negative": int(tn),
-                "false_positive": int(fp),
-                "false_negative": int(fn),
-                "true_positive": int(tp),
-            },
+            "brier_score": round(brier_score_loss(y_test, proba), 4),
+            "mean_predicted_pd": round(float(proba.mean()), 4),
+            "observed_default_rate": round(float(y_test.mean()), 4),
         }
 
     # Top-decile capture: of the riskiest 10% of applicants by predicted
@@ -137,10 +140,15 @@ def main() -> None:
     with open(os.path.join(MODELS_DIR, "metrics.json"), "w") as f:
         json.dump(metrics, f, indent=2)
 
-    joblib.dump({"model": logreg, "scaler": scaler, "features": MODEL_FEATURES},
-                os.path.join(MODELS_DIR, "logreg.joblib"))
-    joblib.dump({"model": xgb, "features": MODEL_FEATURES},
-                os.path.join(MODELS_DIR, "xgb.joblib"))
+    joblib.dump(
+        {"model": logreg, "scaler": scaler, "features": MODEL_FEATURES,
+         "cleaning_params": cleaning_params},
+        os.path.join(MODELS_DIR, "logreg.joblib"),
+    )
+    joblib.dump(
+        {"model": xgb, "features": MODEL_FEATURES, "cleaning_params": cleaning_params},
+        os.path.join(MODELS_DIR, "xgb.joblib"),
+    )
 
     print(json.dumps(metrics, indent=2))
 

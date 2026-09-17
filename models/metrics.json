@@ -1,27 +1,21 @@
 {
   "logistic_regression": {
-    "roc_auc": 0.8628,
-    "pr_auc": 0.3885,
-    "ks_statistic": 0.5712,
-    "gini": 0.7255,
-    "confusion_matrix_at_0.5": {
-      "true_negative": 28256,
-      "false_positive": 6738,
-      "false_negative": 596,
-      "true_positive": 1910
-    }
+    "roc_auc": 0.8609,
+    "pr_auc": 0.3861,
+    "ks_statistic": 0.5639,
+    "gini": 0.7219,
+    "brier_score": 0.0498,
+    "mean_predicted_pd": 0.0665,
+    "observed_default_rate": 0.0668
   },
   "xgboost": {
-    "roc_auc": 0.8684,
-    "pr_auc": 0.4032,
-    "ks_statistic": 0.5757,
-    "gini": 0.7368,
-    "confusion_matrix_at_0.5": {
-      "true_negative": 28215,
-      "false_positive": 6779,
-      "false_negative": 585,
-      "true_positive": 1921
-    },
-    "top_decile_capture_rate": 0.5547
+    "roc_auc": 0.8694,
+    "pr_auc": 0.4075,
+    "ks_statistic": 0.5778,
+    "gini": 0.7387,
+    "brier_score": 0.0486,
+    "mean_predicted_pd": 0.0667,
+    "observed_default_rate": 0.0668,
+    "top_decile_capture_rate": 0.5591
   }
 }

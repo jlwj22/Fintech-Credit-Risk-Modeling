@@ -23,3 +23,13 @@ def test_score_to_tier_boundaries():
 def test_pd_to_tier_consistency():
     tier = pd_to_tier(0.02)
     assert tier in {"Excellent", "Good", "Fair", "Poor", "Very Poor"}
+
+
+def test_fractional_scores_between_tiers_are_assigned():
+    assert score_to_tier(579.6) == "Very Poor"
+    assert score_to_tier(649.5) == "Poor"
+    assert score_to_tier(749.99) == "Good"
+
+
+def test_two_percent_pd_near_base_score():
+    assert abs(float(pd_to_score(0.02)) - 720) < 2

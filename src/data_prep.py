@@ -2,7 +2,7 @@
 Data cleaning and feature engineering for the credit risk dataset.
 
 Source: "Give Me Some Credit" (Kaggle), ~150k consumer credit records.
-Target: SeriousDlqin2yrs -- borrower experienced 90+ days past due
+Target: SeriousDlqin2yrs, whether the borrower had 90+ days past due
 delinquency (or worse) within two years of the credit report date.
 
 This module is intentionally dependency-light (pandas/numpy only) so it can
@@ -62,47 +62,69 @@ def load_raw(path: str = RAW_PATH) -> pd.DataFrame:
     return df
 
 
-def clean_and_engineer(df: pd.DataFrame) -> pd.DataFrame:
+def fit_cleaning_params(df: pd.DataFrame) -> dict:
+    """Learn the caps and imputation values from training data.
+
+    Keeping these separate from the transform means the test set and any
+    single applicant scored later (app, API) are cleaned with the training
+    statistics instead of statistics computed on themselves.
+    """
+    params: dict = {"past_due_caps": {}}
+    for col in PAST_DUE_COLS:
+        values = df[col].astype(float)
+        params["past_due_caps"][col] = float(values[~values.isin([96, 98])].quantile(0.999))
+    params["age_median"] = float(df.loc[df["age"] >= 18, "age"].median())
+    params["util_cap"] = float(df["RevolvingUtilizationOfUnsecuredLines"].quantile(0.995))
+    params["debt_ratio_cap"] = float(df["DebtRatio"].quantile(0.995))
+    params["income_median"] = float(df["MonthlyIncome"].median())
+    return params
+
+
+def clean_and_engineer(df: pd.DataFrame, params: dict | None = None) -> pd.DataFrame:
+    """Clean raw records and add engineered features.
+
+    If ``params`` is None they are fit on ``df`` itself, which is only
+    appropriate for exploration. Training and scoring should pass the params
+    fit on the training split.
+    """
+    if params is None:
+        params = fit_cleaning_params(df)
     df = df.copy()
 
-    # Several numeric columns receive float values (quantile caps, medians)
-    # during cleaning below. Cast up front so a cap/impute that happens to
-    # land on a fractional value doesn't hit pandas' strict int64 setitem
-    # dtype check -- on some samples a quantile lands on a whole number
-    # (e.g. 6.0) and silently works, but that's not guaranteed in general.
-    float_cols = PAST_DUE_COLS + ["age", "RevolvingUtilizationOfUnsecuredLines", "DebtRatio"]
+    # Several numeric columns receive float values (caps, medians) below.
+    # Cast up front so pandas doesn't reject a fractional value written into
+    # an int64 column.
+    float_cols = PAST_DUE_COLS + [
+        "age", "RevolvingUtilizationOfUnsecuredLines", "DebtRatio", "MonthlyIncome",
+        "NumberOfDependents",
+    ]
     df[float_cols] = df[float_cols].astype(float)
 
     # --- Sentinel/error-code handling -------------------------------------
     # 96/98 in the past-due columns are data-entry error codes, not counts.
     # Cap them at the highest plausible observed value instead of dropping
-    # ~3k rows, and keep the raw column so the cap is auditable.
+    # ~3k rows.
     for col in PAST_DUE_COLS:
-        sentinel_mask = df[col].isin([96, 98])
-        cap_value = df.loc[~sentinel_mask, col].quantile(0.999)
-        df.loc[sentinel_mask, col] = cap_value
+        df.loc[df[col].isin([96, 98]), col] = params["past_due_caps"][col]
 
     # A single record has age == 0, which is impossible for a credit
     # applicant; impute with the median age.
-    df.loc[df["age"] < 18, "age"] = df["age"].median()
+    df.loc[df["age"] < 18, "age"] = params["age_median"]
 
-    # RevolvingUtilizationOfUnsecuredLines should theoretically sit in
-    # [0, ~1.5]; a handful of records report values in the thousands. Cap at
-    # the 99.5th percentile of "plausible" values to avoid one outlier
-    # dominating the model, and keep the capped version as its own feature.
-    cap_util = df["RevolvingUtilizationOfUnsecuredLines"].quantile(0.995)
+    # RevolvingUtilizationOfUnsecuredLines should sit roughly in [0, 1.5];
+    # a handful of records report values in the thousands. Cap at the 99.5th
+    # percentile and keep the capped version as its own feature.
     df["RevolvingUtilization_capped"] = df[
         "RevolvingUtilizationOfUnsecuredLines"
-    ].clip(upper=cap_util)
+    ].clip(upper=params["util_cap"])
 
     # DebtRatio has the same issue (division blow-ups when MonthlyIncome is
     # ~0); cap before log-transforming.
-    cap_debt = df["DebtRatio"].quantile(0.995)
-    df["DebtRatio"] = df["DebtRatio"].clip(upper=cap_debt)
+    df["DebtRatio"] = df["DebtRatio"].clip(upper=params["debt_ratio_cap"])
 
     # --- Missing values ------------------------------------------------
     df["MonthlyIncome_missing"] = df["MonthlyIncome"].isna().astype(int)
-    df["MonthlyIncome"] = df["MonthlyIncome"].fillna(df["MonthlyIncome"].median())
+    df["MonthlyIncome"] = df["MonthlyIncome"].fillna(params["income_median"])
 
     df["NumberOfDependents_missing"] = df["NumberOfDependents"].isna().astype(int)
     df["NumberOfDependents"] = df["NumberOfDependents"].fillna(0)
