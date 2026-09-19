@@ -1,0 +1,33 @@
+variable,psi,status
+percent_bc_gt_75,0.1317,moderate shift
+bc_util,0.1189,moderate shift
+revol_util,0.1101,moderate shift
+total_acc,0.0567,stable
+inq_last_6mths,0.0534,stable
+mort_acc,0.0503,stable
+fico,0.0489,stable
+purpose,0.0379,stable
+total_rev_hi_lim_log,0.0377,stable
+mths_since_last_record,0.0322,stable
+loan_amnt,0.0313,stable
+num_actv_rev_tl,0.0304,stable
+loan_to_income,0.0288,stable
+num_tl_op_past_12m,0.0263,stable
+emp_years,0.0201,stable
+pd,0.0157,stable
+open_acc,0.0135,stable
+annual_inc_log,0.0123,stable
+acc_open_past_24mths,0.0117,stable
+revol_bal_log,0.0114,stable
+verification_status,0.0106,stable
+credit_history_years,0.01,stable
+home_ownership,0.0096,stable
+dti,0.0077,stable
+mths_since_recent_inq,0.0068,stable
+mo_sin_rcnt_tl,0.0051,stable
+pct_tl_nvr_dlq,0.0051,stable
+mths_since_last_delinq,0.0032,stable
+pub_rec,0.0016,stable
+delinq_2yrs,0.0016,stable
+avg_cur_bal_log,0.0011,stable
+pub_rec_bankruptcies,0.0004,stable

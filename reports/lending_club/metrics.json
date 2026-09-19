@@ -1,0 +1,53 @@
+{
+  "train_loans": 337996,
+  "test_loans": 282787,
+  "trees": 932,
+  "model": {
+    "roc_auc": 0.6938,
+    "ks_statistic": 0.2822,
+    "brier_score": 0.1191,
+    "mean_predicted_pd": 0.1372,
+    "observed_default_rate": 0.1488,
+    "gini": 0.3876
+  },
+  "lending_club_sub_grade": {
+    "roc_auc": 0.6786,
+    "ks_statistic": 0.2631,
+    "gini": 0.3573
+  },
+  "lending_club_interest_rate": {
+    "roc_auc": 0.6784
+  },
+  "ablation_with_state_unemployment": {
+    "roc_auc": 0.6938,
+    "mean_predicted_pd": 0.1363
+  },
+  "loss_assumptions": {
+    "lgd": 0.8919,
+    "ead_ratio": 0.5768,
+    "interest_before_default": 0.1491,
+    "paid_interest_share": 0.8173
+  },
+  "cost_assumptions": {
+    "servicing_fee": 0.01,
+    "funding_cost_annual": 0.04,
+    "avg_balance_years": 1.5,
+    "carry_cost": 0.06
+  },
+  "profit_maximizing_approval_rate": 0.55,
+  "profit_maximizing_pd_cutoff": 0.1294,
+  "portfolio_expected_loss": 247090230.7099,
+  "portfolio_realized_loss": 273751933.2426,
+  "portfolio_expected_profit": 20845637.8742,
+  "portfolio_realized_economic_profit": -25900207.6309,
+  "macro_satellite": {
+    "intercept": -3.409,
+    "beta_level": 0.0548,
+    "beta_change": 0.203,
+    "r_squared": 0.5118,
+    "quarters": 136,
+    "latest_unemployment": 4.3,
+    "latest_quarter": "2026-04-01"
+  },
+  "score_psi_2016_2018_vs_train": 0.0157
+}
