@@ -1,0 +1,19 @@
+[project]
+name = "credit-risk-scoring"
+version = "1.0.0"
+description = "Probability-of-default models, scorecard scaling, loss and profit analysis, and a scoring API."
+requires-python = ">=3.11"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = ["notebooks"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+# Plotting modules call matplotlib.use() before importing pyplot.
+ignore = ["E402"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = ["ignore::DeprecationWarning", "ignore::PendingDeprecationWarning"]
