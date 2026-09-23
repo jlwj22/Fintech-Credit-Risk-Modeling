@@ -16,4 +16,5 @@ ignore = ["E402"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
 filterwarnings = ["ignore::DeprecationWarning", "ignore::PendingDeprecationWarning"]
